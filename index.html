@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#faf8f5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1c1917" media="(prefers-color-scheme: dark)">
+<meta name="description" content="Journal personnel de suivi inflammatoire, hors ligne.">
+<title>Journal inflammation</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/app.css">
+<script type="module" src="src/ui/app.js"></script>
+</head>
+<body>
+<header class="top">
+  <h1>Journal inflammation</h1>
+</header>
+<div id="banners" aria-live="polite"></div>
+<main id="view"><p class="muted">Chargement…</p></main>
+<nav class="tabs" id="tabs" aria-label="Navigation">
+  <a href="#saisie" data-tab="saisie"><span aria-hidden="true">✎</span>Saisie</a>
+  <a href="#historique" data-tab="historique"><span aria-hidden="true">☰</span>Historique</a>
+  <a href="#analyse" data-tab="analyse"><span aria-hidden="true">◔</span>Analyse</a>
+  <a href="#sauvegarde" data-tab="sauvegarde"><span aria-hidden="true">⇪</span>Sauvegarde</a>
+</nav>
+<noscript><p class="card">Cette application nécessite JavaScript.</p></noscript>
+</body>
+</html>
