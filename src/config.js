@@ -6,6 +6,7 @@ export const MOODS = [
   { id: "energique", label: "Énergique" },
   { id: "anxieuse", label: "Anxieuse" },
   { id: "fatiguee", label: "Fatiguée" },
+  { id: "irritable", label: "Irritable" },
   { id: "neutre", label: "Neutre", exclusive: true },
 ];
 
