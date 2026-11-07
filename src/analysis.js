@@ -1,70 +1,63 @@
-// Analyse locale : comparaisons avec/sans un facteur et corrélations,
-// le jour même (J) et le lendemain (J+1). Fonctions pures, sans affichage.
-import {
-  ALCOHOL_TYPES, ANALYSIS, CUSTOM_FOOD_PREFIX, FOODS, INTENSITY_LABELS, MOODS, SPORTS, labelOf,
-} from "./config.js";
+// Analyse locale, pensée pour être lue en phrases : « dans les 3 jours après
+// tel facteur, tu as eu des douleurs X fois sur N ». Fonctions pures.
+import { ALCOHOL_TYPES, ANALYSIS, CUSTOM_FOOD_PREFIX, FOODS, INTENSITY_LABELS, MOODS, SPORTS, labelOf } from "./config.js";
 import { addDays, diffDays } from "./dates.js";
 import { painScore, skinScore, sleepHours } from "./model.js";
 
-/** Mesures que l'on cherche à expliquer. */
+/** Nombre de jours suivants observés après un facteur (lendemain à J+3). */
+export const WINDOW = 3;
+const MIN_FOLLOW = 2; // jours renseignés minimum dans la fenêtre
+export const NOTABLE = 0.25; // écart de fréquence à partir duquel c'est une « piste »
+
+/** Mesures : `present(e)` vaut true, false, ou null si non renseigné. */
 export const OUTCOMES = [
-  { id: "douleur", label: "Douleur", unit: "sur 3", value: painScore },
-  { id: "psoriasis", label: "Psoriasis", unit: "zones", value: skinScore },
-  { id: "crise", label: "Crise", unit: "%", percent: true, value: (e) => (e.flare === null ? null : e.flare ? 1 : 0) },
+  { id: "douleur", label: "Douleurs", noun: "des douleurs", after: "de douleurs", present: (e) => (painScore(e) === null ? null : painScore(e) > 0) },
+  { id: "psoriasis", label: "Psoriasis", noun: "des plaques", after: "de plaques", present: (e) => (skinScore(e) === null ? null : skinScore(e) > 0) },
+  { id: "fatigue", label: "Fatigue", noun: "de la fatigue", after: "de fatigue", present: (e) => (e.moods.length ? e.moods.includes("fatiguee") : null) },
+  { id: "crise", label: "Crises", noun: "une crise", after: "d'une crise", present: (e) => e.flare },
 ];
+
+const outcomeOf = (id) => {
+  const o = OUTCOMES.find((x) => x.id === id);
+  if (!o) throw new Error(`Mesure inconnue : ${id}`);
+  return o;
+};
 
 // Une valeur `null` signifie « on ne sait pas » : le jour est ignoré pour ce facteur.
 const ateKnown = (e) => e.foods.length > 0;
 const moodKnown = (e) => e.moods.length > 0;
 
-/** Facteurs oui/non testés. Les aliments perso présents dans les données sont ajoutés. */
-export function binaryFactors(entries = []) {
-  const custom = [...new Set(entries.flatMap((e) => e.foods.filter((f) => f.startsWith(CUSTOM_FOOD_PREFIX))))];
-  const foods = [...FOODS.map((f) => f.id), ...custom].map((id) => ({
-    id: `aliment:${id}`, group: "Alimentation", label: labelOf(FOODS, id),
-    value: (e) => (ateKnown(e) ? e.foods.includes(id) : null),
-  }));
-  const intensities = Object.keys(INTENSITY_LABELS).map((lvl) => ({
-    id: `intensite:${lvl}`, group: "Sport", label: `Sport d'intensité ${INTENSITY_LABELS[lvl]}`,
-    value: (e) => e.sports.some((s) => SPORTS.find((x) => x.id === s)?.intensity === lvl),
-  }));
+/**
+ * Facteurs oui/non testés. La crème à la cortisone n'en fait pas partie :
+ * préventive ou réaction à une poussée, elle ne peut pas en être la cause.
+ */
+export function binaryFactors(entries = [], outcomeId = "douleur") {
+  const used = [...new Set(entries.flatMap((e) => e.foods))];
+  const foodIds = [...FOODS.map((f) => f.id), ...used.filter((f) => f.startsWith(CUSTOM_FOOD_PREFIX))];
   return [
-    ...foods,
+    ...foodIds.map((id) => ({
+      id: `aliment:${id}`, group: "Alimentation", label: labelOf(FOODS, id),
+      value: (e) => (ateKnown(e) ? e.foods.includes(id) : null),
+    })),
     { id: "sport", group: "Sport", label: "Sport (quel qu'il soit)", value: (e) => e.sports.length > 0 },
     ...SPORTS.map((s) => ({ id: `sport:${s.id}`, group: "Sport", label: s.label, value: (e) => e.sports.includes(s.id) })),
-    ...intensities,
+    ...Object.keys(INTENSITY_LABELS).map((lvl) => ({
+      id: `intensite:${lvl}`, group: "Sport", label: `Sport d'intensité ${INTENSITY_LABELS[lvl]}`,
+      value: (e) => e.sports.some((s) => SPORTS.find((x) => x.id === s)?.intensity === lvl),
+    })),
     { id: "alcool", group: "Alcool", label: "Alcool (quel qu'il soit)", value: (e) => e.alcohol.types.length > 0 },
     ...ALCOHOL_TYPES.map((t) => ({ id: `alcool:${t.id}`, group: "Alcool", label: t.label, value: (e) => e.alcohol.types.includes(t.id) })),
     { id: "alcool:3+", group: "Alcool", label: "Plus de 2 verres", value: (e) => e.alcohol.glasses === "3+" },
-    ...MOODS.map((m) => ({ id: `humeur:${m.id}`, group: "Humeur", label: m.label, value: (e) => (moodKnown(e) ? e.moods.includes(m.id) : null) })),
+    ...MOODS.filter((m) => !(outcomeId === "fatigue" && m.id === "fatiguee")).map((m) => ({
+      id: `humeur:${m.id}`, group: "Humeur", label: m.label, value: (e) => (moodKnown(e) ? e.moods.includes(m.id) : null),
+    })),
     { id: "sommeil:moyen", group: "Sommeil", label: "Sommeil moyen", value: (e) => (e.sleep.quality ? e.sleep.quality === "moyen" : null) },
-    { id: "cortisone", group: "Traitement", label: "Crème cortisone (psoriasis)", value: (e) => e.cortisone },
-    { id: "injection", group: "Traitement", label: "Jour d'injection", value: (e) => e.injection },
+    {
+      id: "sommeil:court", group: "Sommeil", label: "Nuit courte (moins de 7 h)",
+      value: (e) => { const h = sleepHours(e.sleep); return h === null ? null : h < 7; },
+    },
     { id: "regles", group: "Cycle", label: "Règles", value: (e) => e.period },
   ];
-}
-
-/** Variables chiffrées testées par corrélation. */
-export const CONTINUOUS = [
-  { id: "sommeil:heures", label: "Heures de sommeil", value: (e) => sleepHours(e.sleep) },
-  { id: "injection:jours", label: "Jours depuis l'injection", value: (e, ctx) => ctx.daysSinceInjection.get(e.date) ?? null },
-];
-
-export function mean(a) {
-  return a.length ? a.reduce((x, y) => x + y, 0) / a.length : NaN;
-}
-
-export function pearson(x, y) {
-  const n = x.length;
-  if (n < 2 || n !== y.length) return NaN;
-  const mx = mean(x), my = mean(y);
-  let sxy = 0, sxx = 0, syy = 0;
-  for (let i = 0; i < n; i++) {
-    sxy += (x[i] - mx) * (y[i] - my);
-    sxx += (x[i] - mx) ** 2;
-    syy += (y[i] - my) ** 2;
-  }
-  return sxx && syy ? sxy / Math.sqrt(sxx * syy) : NaN;
 }
 
 /** Nombre de jours depuis la dernière injection, pour chaque jour enregistré après la première. */
@@ -99,81 +92,110 @@ export function periodCycles(entries) {
   }));
 }
 
-function context(entries) {
-  return { byDate: new Map(entries.map((e) => [e.date, e])), daysSinceInjection: daysSinceInjection(entries) };
+/**
+ * La mesure est-elle apparue dans les 3 jours qui suivent `date` ?
+ * null si moins de 2 de ces jours sont renseignés.
+ */
+function followedBy(byDate, outcome, date) {
+  const seen = [];
+  for (let k = 1; k <= WINDOW; k++) {
+    const e = byDate.get(addDays(date, k));
+    const v = e ? outcome.present(e) : null;
+    if (v !== null && v !== undefined) seen.push(v);
+  }
+  return seen.length >= MIN_FOLLOW ? seen.includes(true) : null;
 }
 
-/** Compare la mesure avec/sans le facteur, le jour même (lag 0) ou le lendemain (lag 1). */
-function compare(entries, ctx, outcome, factor, lag) {
-  const withF = [], without = [];
+/** Compare la fréquence de la mesure dans les 3 jours suivants, avec et sans le facteur. */
+export function compareFactor(entries, outcome, factor) {
+  const byDate = new Map(entries.map((e) => [e.date, e]));
+  const w = { yes: 0, n: 0 }, wo = { yes: 0, n: 0 };
   for (const e of entries) {
-    const f = factor.value(e, ctx);
-    const target = ctx.byDate.get(addDays(e.date, lag));
-    const y = target ? outcome.value(target) : null;
-    if (f === null || f === undefined || y === null) continue;
-    (f ? withF : without).push(y);
+    const f = factor.value(e);
+    if (f === null || f === undefined) continue;
+    const after = followedBy(byDate, outcome, e.date);
+    if (after === null) continue;
+    const g = f ? w : wo;
+    g.n++;
+    if (after) g.yes++;
   }
-  const enough = withF.length >= ANALYSIS.minGroup && without.length >= ANALYSIS.minGroup;
+  const enough = w.n >= ANALYSIS.minGroup && wo.n >= ANALYSIS.minGroup;
   return {
-    nWith: withF.length,
-    nWithout: without.length,
-    with: enough ? mean(withF) : NaN,
-    without: enough ? mean(without) : NaN,
-    diff: enough ? mean(withF) - mean(without) : NaN,
-    fragile: enough && Math.min(withF.length, without.length) < ANALYSIS.solidGroup,
+    with: w,
+    without: wo,
+    enough,
+    diff: enough ? w.yes / w.n - wo.yes / wo.n : NaN,
+    fragile: enough && Math.min(w.n, wo.n) < ANALYSIS.solidGroup,
   };
 }
 
-function correlate(entries, ctx, outcome, variable, lag) {
-  const x = [], y = [];
-  for (const e of entries) {
-    const v = variable.value(e, ctx);
-    const target = ctx.byDate.get(addDays(e.date, lag));
-    const o = target ? outcome.value(target) : null;
-    if (v === null || o === null) continue;
-    x.push(v);
-    y.push(o);
-  }
-  return { n: x.length, r: x.length >= ANALYSIS.minPairs ? pearson(x, y) : NaN };
+const INJECTION_PHASES = [
+  { from: 0, to: 3, label: "0 à 3 jours après l'injection" },
+  { from: 4, to: 13, label: "4 à 13 jours après" },
+  { from: 14, to: 20, label: "14 à 20 jours après" },
+  { from: 21, to: Infinity, label: "21 jours et plus" },
+];
+
+/** Fréquence de la mesure selon la phase du cycle d'injection. */
+export function injectionPhases(entries, outcomeId) {
+  const outcome = outcomeOf(outcomeId);
+  const since = daysSinceInjection(entries);
+  return INJECTION_PHASES.map((p) => {
+    let yes = 0, n = 0;
+    for (const e of entries) {
+      const d = since.get(e.date);
+      const v = outcome.present(e);
+      if (d === undefined || v === null || v === undefined || d < p.from || d > p.to) continue;
+      n++;
+      if (v) yes++;
+    }
+    return { ...p, yes, n };
+  });
 }
 
-/**
- * Analyse complète pour une mesure. `entries` doit être trié par date.
- * Les facteurs sans assez de jours avec ET sans sont écartés et comptés.
- */
-export function analyse(entries, outcomeId = "douleur") {
-  const outcome = OUTCOMES.find((o) => o.id === outcomeId);
-  if (!outcome) throw new Error(`Mesure inconnue : ${outcomeId}`);
-  const ctx = context(entries);
-  const values = entries.map(outcome.value).filter((v) => v !== null);
+/** Résumé par mesure : jours renseignés, jours concernés, dernier jour concerné. */
+export function summary(entries) {
+  return OUTCOMES.map((o) => {
+    const known = entries.filter((e) => { const v = o.present(e); return v !== null && v !== undefined; });
+    const hits = known.filter((e) => o.present(e));
+    return { id: o.id, label: o.label, noun: o.noun, known: known.length, yes: hits.length, last: hits.at(-1)?.date ?? null };
+  });
+}
 
-  const factors = [];
-  let skipped = 0;
-  for (const f of binaryFactors(entries)) {
-    const sameDay = compare(entries, ctx, outcome, f, 0);
-    const nextDay = compare(entries, ctx, outcome, f, 1);
-    if (isNaN(sameDay.diff) && isNaN(nextDay.diff)) { skipped++; continue; }
-    factors.push({ id: f.id, group: f.group, label: f.label, sameDay, nextDay });
+/** Facteurs impossibles à analyser, avec la raison (presque toujours / presque jamais). */
+function unanalysable(entries, outcome, factors, analysed) {
+  const out = { always: [], rare: [] };
+  for (const f of factors) {
+    if (analysed.has(f.id)) continue;
+    const vals = entries.map((e) => f.value(e)).filter((v) => v !== null && v !== undefined);
+    const yes = vals.filter(Boolean).length;
+    if (!yes) continue; // jamais rencontré : rien à dire
+    if (vals.length - yes < ANALYSIS.minGroup) out.always.push(f.label);
+    else out.rare.push(f.label);
   }
-  const strength = (r) => Math.abs(isNaN(r.nextDay.diff) ? r.sameDay.diff : r.nextDay.diff);
-  factors.sort((a, b) => strength(b) - strength(a));
+  return out;
+}
 
-  const correlations = CONTINUOUS.map((v) => ({
-    id: v.id, label: v.label,
-    sameDay: correlate(entries, ctx, outcome, v, 0),
-    nextDay: correlate(entries, ctx, outcome, v, 1),
-  }));
-
+/** Analyse complète d'une mesure. `entries` doit être trié par date. */
+export function analyse(entries, outcomeId = "douleur") {
+  const outcome = outcomeOf(outcomeId);
+  const factors = binaryFactors(entries, outcomeId);
+  const results = [];
+  for (const f of factors) {
+    const c = compareFactor(entries, outcome, f);
+    if (c.enough) results.push({ id: f.id, group: f.group, label: f.label, ...c });
+  }
+  results.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
   return {
-    outcome: { id: outcome.id, label: outcome.label, unit: outcome.unit, percent: !!outcome.percent },
+    outcome: { id: outcome.id, label: outcome.label, noun: outcome.noun, after: outcome.after },
     days: entries.length,
-    measured: values.length,
-    average: mean(values),
-    flares: entries.filter((e) => e.flare === true).length,
     enoughDays: entries.length >= ANALYSIS.minDays,
-    factors,
-    skipped,
-    correlations,
+    summary: summary(entries),
+    leads: results.filter((r) => Math.abs(r.diff) >= NOTABLE),
+    factors: results,
+    unanalysable: unanalysable(entries, outcome, factors, new Set(results.map((r) => r.id))),
+    injections: entries.filter((e) => e.injection === true).map((e) => e.date),
+    phases: injectionPhases(entries, outcomeId),
     cycles: periodCycles(entries),
   };
 }

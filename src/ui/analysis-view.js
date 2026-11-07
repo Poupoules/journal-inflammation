@@ -1,54 +1,84 @@
-// Écran Analyse : résultats lisibles, toujours accompagnés de leurs limites.
+// Écran Analyse : résumé en phrases, calendrier coloré, pistes en « X fois
+// sur N », phases d'injection, et ce qui ne peut pas encore être analysé.
 import { ANALYSIS } from "../config.js";
-import { formatShort } from "../dates.js";
-import { OUTCOMES, analyse } from "../analysis.js";
+import { addDays, diffDays, formatShort, range, today } from "../dates.js";
+import { OUTCOMES, WINDOW, analyse } from "../analysis.js";
+import { painScore } from "../model.js";
 import { html } from "./dom.js";
 
-// Écart à partir duquel un résultat est mis en couleur, selon la mesure.
-const NOTABLE = { douleur: 0.5, psoriasis: 0.5, crise: 0.15 };
 let selected = "douleur"; // mesure choisie, conservée pendant la session
 
-const num = (v, digits = 1) => v.toFixed(digits).replace(".", ",");
+const plural = (n, word) => `${n} ${word}${n > 1 ? "s" : ""}`;
+const times = (g) => `${g.yes} fois sur ${g.n}`;
+// « 7 nov. » termine déjà la phrase : pas de second point.
+const dot = (s) => (s.endsWith(".") ? s : `${s}.`);
+const MAX_LEADS = 5;
 
-function fmt(outcome, v) {
-  if (isNaN(v)) return "–";
-  return outcome.percent ? `${Math.round(v * 100)} %` : num(v);
+/** Niveau de couleur d'un jour pour la mesure : 0 rien, 1-3 intensité, null inconnu. */
+function level(e, outcomeId) {
+  if (!e) return undefined;
+  if (outcomeId === "douleur") return painScore(e);
+  const v = OUTCOMES.find((o) => o.id === outcomeId).present(e);
+  if (v === null || v === undefined) return null;
+  return v ? 3 : 0;
 }
 
-function fmtDiff(outcome, v) {
-  if (isNaN(v)) return "–";
-  const sign = v > 0 ? "+" : v < 0 ? "−" : "";
-  return outcome.percent ? `${sign}${Math.abs(Math.round(v * 100))} pts` : `${sign}${num(Math.abs(v))}`;
+function calendar(days, outcomeId) {
+  const byDate = new Map(days.map((e) => [e.date, e]));
+  const first = days[0].date;
+  // Semaines du lundi au dimanche.
+  const weekday = (new Date(`${first}T12:00:00`).getDay() + 6) % 7;
+  const start = addDays(first, -weekday);
+  const cells = range(start, today()).map((d) => {
+    if (d < first) return html`<div class="d out"></div>`;
+    const e = byDate.get(d);
+    const lvl = level(e, outcomeId);
+    const cls = lvl === undefined ? "none" : lvl === null ? "unk" : `l${lvl}`;
+    const marks = e ? [e.injection && "💉", e.cortisone && "🧴", e.period && "🩸"].filter(Boolean).join("") : "";
+    return html`<a class="d ${cls}" href="#saisie/${d}" title="${formatShort(d)}"><span>${Number(d.slice(8))}</span><small>${marks}</small></a>`;
+  });
+  const legend = outcomeId === "douleur"
+    ? [["l0", "aucune"], ["l1", "légère"], ["l2", "moyenne"], ["l3", "intense"]]
+    : [["l0", "non"], ["l3", "oui"]];
+  return html`
+    <div class="cal-head">${["L", "M", "M", "J", "V", "S", "D"].map((x) => html`<span>${x}</span>`)}</div>
+    <div class="cal">${cells}</div>
+    <p class="cal-legend">${legend.map(([c, t]) => html`<span><i class="${c}"></i>${t}</span>`)}
+      <span><i class="unk"></i>non renseigné</span><span><i class="none"></i>non rempli</span></p>
+    <p class="hint">💉 injection · 🧴 crème cortisone · 🩸 règles. Touche un jour pour l'ouvrir.</p>`;
 }
 
-function cls(outcome, v) {
-  if (isNaN(v)) return "";
-  return v >= NOTABLE[outcome.id] ? "worse" : v <= -NOTABLE[outcome.id] ? "better" : "";
+function summaryLines(r, lastDate) {
+  return r.summary.map((s) => {
+    if (!s.known) return html`<li><strong>${s.label}</strong> : pas encore renseigné.</li>`;
+    if (!s.yes) return html`<li><strong>${s.label}</strong> : aucun jour sur ${s.known} renseignés.</li>`;
+    const calm = diffDays(s.last, lastDate);
+    const end = calm >= 3 ? `, plus rien depuis le ${formatShort(s.last)} (${calm} jours)` : `, le dernier le ${formatShort(s.last)}`;
+    return html`<li><strong>${s.label}</strong> : ${dot(`${plural(s.yes, "jour")} sur ${s.known} renseignés${end}`)}</li>`;
+  });
 }
 
-function line(outcome, title, c) {
-  if (isNaN(c.diff)) return html`<div class="factor-line"><span>${title}</span><span>pas assez de jours</span></div>`;
-  return html`<div class="factor-line">
-    <span>${title} : avec ${fmt(outcome, c.with)} / sans ${fmt(outcome, c.without)}
-      <span class="muted">(${c.nWith} j / ${c.nWithout} j)</span></span>
-    <span><span class="${cls(outcome, c.diff)}">${fmtDiff(outcome, c.diff)}</span>${c.fragile ? html` <span class="fragile">fragile</span>` : ""}</span>
-  </div>`;
-}
-
-function factorRow(outcome, f) {
+function leadSentence(o, f) {
+  const sens = f.diff > 0 ? html`<span class="worse">plus souvent</span>` : html`<span class="better">moins souvent</span>`;
   return html`<div class="factor">
     <div class="factor-head"><strong>${f.label}</strong><span class="grp">${f.group}</span></div>
-    ${line(outcome, "Le lendemain", f.nextDay)}
-    ${line(outcome, "Le jour même", f.sameDay)}
+    <p class="lead">Dans les ${WINDOW} jours après « ${f.label} », tu as eu ${o.noun} <strong>${times(f.with)}</strong>.
+      Après les autres jours : ${times(f.without)}. Donc ${sens}.
+      ${f.fragile ? html`<span class="fragile">à confirmer</span>` : ""}</p>
   </div>`;
 }
 
-function corrText(c) {
-  if (isNaN(c.r)) return `pas assez de points (${c.n}/${ANALYSIS.minPairs})`;
-  const a = Math.abs(c.r);
-  const force = a < 0.2 ? "aucun lien net" : a < 0.4 ? "lien faible" : a < 0.6 ? "lien modéré" : "lien fort";
-  const sens = a < 0.2 ? "" : c.r > 0 ? ", plus il y en a, plus la mesure monte" : ", plus il y en a, plus la mesure baisse";
-  return `r = ${num(c.r, 2)} : ${force}${sens} (${c.n} j)`;
+function phasesBlock(r) {
+  const o = r.outcome;
+  if (!r.injections.length) return html`<p class="muted">Aucune injection enregistrée pour l'instant.</p>`;
+  const rows = r.phases.filter((p) => p.n).map((p) =>
+    html`<div class="factor-line"><span>${p.label}</span><span><strong>${p.yes}</strong> jour${p.yes > 1 ? "s" : ""} sur ${p.n}</span></div>`);
+  return html`
+    <p>${o.label} selon le nombre de jours écoulés depuis l'injection :</p>
+    ${rows.length ? rows : html`<p class="muted">Pas encore de jours renseignés après une injection.</p>`}
+    <p class="hint">${r.injections.length < 3
+      ? `${plural(r.injections.length, "injection")} enregistrée${r.injections.length > 1 ? "s" : ""} : il en faut 2 ou 3 pour voir si un rythme se répète.`
+      : `${r.injections.length} injections enregistrées.`}</p>`;
 }
 
 export async function renderAnalysis(view, app) {
@@ -57,70 +87,73 @@ export async function renderAnalysis(view, app) {
   view.replaceChildren(root);
 
   function render() {
-    const r = analyse(days, selected);
-    const o = r.outcome;
-    const picker = html`<div class="seg" role="group" aria-label="Mesure analysée">${OUTCOMES.map((x) =>
-      html`<button type="button" data-outcome="${x.id}" aria-pressed="${x.id === selected}">${x.label}</button>`)}</div>`;
-
-    if (!r.enoughDays) {
-      const pct = Math.round((r.days / ANALYSIS.minDays) * 100);
-      root.innerHTML = html`<div class="card"><h2>Analyse</h2>
-        <p><strong>${r.days} jour${r.days > 1 ? "s" : ""} enregistré${r.days > 1 ? "s" : ""}</strong> sur ${ANALYSIS.minDays} minimum.</p>
-        <div class="progress" aria-hidden="true"><div style="width:${pct}%"></div></div>
-        <p class="muted">L'analyse s'affiche à partir de ${ANALYSIS.minDays} jours. Elle devient vraiment parlante après 6 à 8 semaines de saisie régulière.</p></div>`;
+    if (!days.length) {
+      root.innerHTML = html`<div class="card"><h2>Analyse</h2><p class="muted">Aucune journée enregistrée pour l'instant.</p></div>`;
       return;
     }
+    const r = analyse(days, selected);
+    const o = r.outcome;
+    const last = days.at(-1).date;
+    const picker = html`<div class="seg" role="group" aria-label="Ce que tu veux comprendre">${OUTCOMES.map((x) =>
+      html`<button type="button" data-outcome="${x.id}" aria-pressed="${x.id === selected}">${x.label}</button>`)}</div>`;
 
-    const notable = r.factors.filter((f) => !isNaN(f.nextDay.diff) && Math.abs(f.nextDay.diff) >= NOTABLE[o.id]);
-    const label = o.id === "douleur" ? "Douleur moyenne" : o.id === "psoriasis" ? "Zones en moyenne" : "Jours de crise";
     root.innerHTML = html`
       <div class="card stack">
-        <h2>Analyse</h2>
+        <h2>En résumé</h2>
+        <p>Sur ${plural(r.days, "jour")} remplis, du ${formatShort(days[0].date)} au ${formatShort(last)} :</p>
+        <ul>${summaryLines(r, last)}</ul>
+      </div>
+
+      <div class="card stack">
+        <h2>Ce que tu veux comprendre</h2>
         ${picker}
-        <div class="stats">
-          <div><b>${r.days}</b><span>jours</span></div>
-          <div><b>${r.flares}</b><span>crises</span></div>
-          <div><b>${fmt(o, r.average)}</b><span>${label}${o.id === "douleur" ? " (0 à 3)" : ""}</span></div>
-        </div>
+        ${calendar(days, selected)}
       </div>
 
       <div class="card">
         <h2>Pistes à surveiller</h2>
-        <p class="muted">Facteurs suivis d'un écart marqué le lendemain. Rouge : ça va moins bien quand le facteur est présent. Vert : ça va mieux.</p>
-        ${notable.length ? notable.map((f) => factorRow(o, f)) : html`<p>Aucun écart marqué pour l'instant.</p>`}
+        ${!r.enoughDays
+          ? html`<p class="muted">Les pistes apparaissent à partir de ${ANALYSIS.minDays} jours remplis (encore ${ANALYSIS.minDays - r.days}).</p>`
+          : r.leads.length
+            ? html`<p class="muted">Ce qui est suivi ${o.after} nettement plus (ou moins) souvent que d'habitude.</p>${r.leads.slice(0, MAX_LEADS).map((f) => leadSentence(o, f))}${
+              r.leads.length > MAX_LEADS ? html`<p class="hint">Et ${r.leads.length - MAX_LEADS} autre(s) dans « Tous les facteurs comparés ».</p>` : ""}`
+            : html`<p>Aucune piste nette pour l'instant : rien n'est suivi ${o.after} nettement plus souvent que les autres jours.</p>`}
       </div>
 
       <div class="card">
-        <details><summary>Tous les facteurs (${r.factors.length})</summary>
-          ${r.factors.map((f) => factorRow(o, f))}
-          ${r.skipped ? html`<p class="hint">${r.skipped} facteur${r.skipped > 1 ? "s" : ""} non analysable${r.skipped > 1 ? "s" : ""} :
-            il faut au moins ${ANALYSIS.minGroup} jours avec et ${ANALYSIS.minGroup} jours sans.</p>` : ""}
+        <h2>Injection</h2>
+        ${phasesBlock(r)}
+      </div>
+
+      ${r.unanalysable.always.length || r.unanalysable.rare.length ? html`<div class="card">
+        <h2>Pourquoi certaines choses n'apparaissent pas</h2>
+        ${r.unanalysable.always.length ? html`<p><strong>Presque tous les jours</strong>, donc impossible de comparer avec des jours sans :
+          ${r.unanalysable.always.join(", ")}.</p>` : ""}
+        ${r.unanalysable.rare.length ? html`<p><strong>Trop peu de jours</strong> pour l'instant (il en faut au moins ${ANALYSIS.minGroup}) :
+          ${r.unanalysable.rare.join(", ")}.</p>` : ""}
+      </div>` : ""}
+
+      ${r.enoughDays && r.factors.length ? html`<div class="card">
+        <details><summary>Tous les facteurs comparés (${r.factors.length})</summary>
+          ${r.factors.map((f) => leadSentence(o, f))}
         </details>
-      </div>
+      </div>` : ""}
 
-      <div class="card">
-        <h2>Sommeil et injection</h2>
-        ${r.correlations.map((c) => html`<div class="factor"><strong>${c.label}</strong>
-          <div class="factor-line"><span>Le jour même : ${corrText(c.sameDay)}</span></div>
-          <div class="factor-line"><span>Le lendemain : ${corrText(c.nextDay)}</span></div></div>`)}
-      </div>
-
-      <div class="card">
+      ${r.cycles.length ? html`<div class="card">
         <h2>Cycles</h2>
-        ${r.cycles.length ? r.cycles.slice().reverse().map((c) => html`<div class="factor-line">
+        ${r.cycles.slice().reverse().map((c) => html`<div class="factor-line">
           <span>Règles du ${formatShort(c.start)}</span>
-          <span>${c.length} jour${c.length > 1 ? "s" : ""}${c.sincePrevious ? ` · cycle de ${c.sincePrevious} j` : ""}</span></div>`)
-          : html`<p class="muted">Aucun jour de règles enregistré.</p>`}
-      </div>
+          <span>${plural(c.length, "jour")}${c.sincePrevious ? ` · cycle de ${c.sincePrevious} jours` : ""}</span></div>`)}
+      </div>` : ""}
 
       <div class="card">
         <h2>À garder en tête</h2>
         <ul class="caveats muted">
-          <li>Une corrélation n'est pas une cause : un facteur peut accompagner une crise sans la provoquer.</li>
-          <li>L'effet peut être inversé : on fait moins de sport quand on a mal.</li>
-          <li>Avec beaucoup d'aliments testés, quelques-uns semblent suspects par pur hasard. « Fragile » = moins de ${ANALYSIS.solidGroup} jours dans un groupe.</li>
+          <li>Un facteur qui revient avant ${o.noun} n'en est pas forcément la cause : il peut juste l'accompagner.</li>
+          <li>L'effet peut être inversé : on bouge moins quand on a mal.</li>
+          <li>Avec beaucoup d'aliments comparés, quelques-uns semblent suspects par pur hasard. « À confirmer » = moins de ${ANALYSIS.solidGroup} jours dans un des deux groupes.</li>
+          <li>La crème à la cortisone n'est pas comparée : elle suit les plaques ou fait partie de ta routine.</li>
           <li>Pour confirmer une piste : arrêter l'aliment 2 à 3 semaines, idéalement avec ton médecin.</li>
-          <li>Pour une analyse plus fine, exporte le tableur (onglet Sauvegarde) et partage-le avec Claude.</li>
         </ul>
       </div>`;
   }

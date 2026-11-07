@@ -144,3 +144,22 @@ details summary { cursor: pointer; color: var(--ac); font-size: .9rem; padding: 
 .caveats li { margin-bottom: 6px; }
 .stack > * + * { margin-top: 10px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* Calendrier de l'analyse : couleurs translucides, lisibles en clair et en sombre */
+.cal-head, .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-head span { text-align: center; font-size: .72rem; color: var(--mut); }
+.cal .d {
+  aspect-ratio: 1; min-width: 0; border-radius: 8px; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; color: var(--tx); text-decoration: none; font-size: .78rem; line-height: 1.1;
+}
+.cal .d small { font-size: .6rem; min-height: .8em; }
+.l0 { background: rgba(47, 125, 91, .28); }
+.l1 { background: rgba(214, 170, 30, .45); }
+.l2 { background: rgba(232, 132, 92, .6); }
+.l3 { background: rgba(190, 50, 40, .7); }
+.unk { background: var(--bd); }
+.none { border: 1px dashed var(--bd); }
+.cal .d.out { visibility: hidden; }
+.cal-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: .78rem; color: var(--mut); margin: 8px 0 0; }
+.cal-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+.lead { margin: 4px 0 0; font-size: .9rem; }
