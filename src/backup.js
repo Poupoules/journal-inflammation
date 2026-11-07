@@ -109,6 +109,18 @@ export function toCSV(days) {
   return "﻿" + lines.join("\r\n") + "\r\n";
 }
 
-export function backupFileName(date, ext) {
-  return `journal-inflammation-${date}.${ext}`;
+/**
+ * Fichiers produits par « Sauvegarder maintenant ». Android ne partage que
+ * certains types de fichiers (pas le .json) : la sauvegarde est donc un .txt
+ * (contenu JSON) et le tableur un .csv, tous deux acceptés par le menu de partage.
+ */
+export function backupFiles(days, { customFoods = [], date, now = new Date() }) {
+  return [
+    {
+      name: `journal-inflammation-${date}-sauvegarde.txt`,
+      type: "text/plain",
+      content: JSON.stringify(buildBackup(days, { customFoods, now }), null, 1),
+    },
+    { name: `journal-inflammation-${date}-tableur.csv`, type: "text/csv", content: toCSV(days) },
+  ];
 }

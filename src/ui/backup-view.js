@@ -1,7 +1,7 @@
 // Écran Sauvegarde : sauvegarder (partage du téléphone), restaurer, état du stockage.
 import { APP_VERSION } from "../version.js";
 import { formatLong, today } from "../dates.js";
-import { backupFileName, buildBackup, parseBackup, planRestore, toCSV } from "../backup.js";
+import { backupFiles, parseBackup, planRestore } from "../backup.js";
 import { html } from "./dom.js";
 
 const PERSISTENCE_TEXT = {
@@ -19,19 +19,19 @@ function download(file) {
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
-/** Envoie les fichiers via le menu de partage ; sinon les télécharge. Renvoie false si annulé. */
+/** Envoie les fichiers via le menu de partage ; sinon les télécharge. Renvoie "partage", "telechargement" ou false si annulé. */
 async function shareOrDownload(files) {
   if (navigator.canShare?.({ files })) {
     try {
       await navigator.share({ files, title: "Sauvegarde du journal" });
-      return true;
+      return "partage";
     } catch (err) {
       if (err.name === "AbortError") return false;
       // Partage refusé par le navigateur : on télécharge à la place.
     }
   }
   files.forEach(download);
-  return true;
+  return "telechargement";
 }
 
 export async function renderBackup(view, app) {
@@ -39,15 +39,20 @@ export async function renderBackup(view, app) {
   view.replaceChildren(root);
   let pending = null; // restauration en attente de confirmation
   let message = null;
+  // Fichiers préparés à l'affichage : le partage doit partir immédiatement
+  // après l'appui, sinon le téléphone peut refuser d'ouvrir le menu.
+  let files = [];
 
   async function render() {
     const days = await app.storage.listDays();
     const last = await app.storage.getMeta("lastBackupAt");
     const persistence = await app.storage.persistence();
+    files = backupFiles(days, { customFoods: await app.customFoods(), date: today() })
+      .map((f) => new File([f.content], f.name, { type: f.type }));
     root.innerHTML = html`
       <div class="card stack">
         <h2>Sauvegarder</h2>
-        <p class="muted">Crée deux fichiers : une sauvegarde complète (pour restaurer) et un tableur (pour analyser avec Claude).
+        <p class="muted">Crée deux fichiers : la sauvegarde complète (…-sauvegarde.txt, pour restaurer) et un tableur (…-tableur.csv, pour analyser avec Claude).
           Choisis ensuite où les envoyer : Google Drive, mail…</p>
         <p>${days.length} jour${days.length > 1 ? "s" : ""} enregistré${days.length > 1 ? "s" : ""}.
           ${last ? `Dernière sauvegarde : ${formatLong(last.slice(0, 10))}.` : "Aucune sauvegarde pour l'instant."}</p>
@@ -61,7 +66,7 @@ export async function renderBackup(view, app) {
         <p class="muted">Récupère tes données depuis un fichier de sauvegarde (nouveau téléphone, données effacées…).
           Rien n'est modifié avant ta confirmation.</p>
         <label class="btn secondary block" style="display:block;text-align:center">Choisir un fichier de sauvegarde
-          <input type="file" accept=".json,application/json" data-act="file" class="sr-only"></label>
+          <input type="file" accept=".txt,.json,text/plain,application/json" data-act="file" class="sr-only"></label>
         ${pending ? restorePreview(pending) : ""}
       </div>
 
@@ -94,16 +99,12 @@ export async function renderBackup(view, app) {
   async function backup(btn) {
     btn.disabled = true;
     try {
-      const days = await app.storage.listDays();
-      const date = today();
-      const json = JSON.stringify(buildBackup(days, { customFoods: await app.customFoods() }), null, 1);
-      const files = [
-        new File([json], backupFileName(date, "json"), { type: "application/json" }),
-        new File([toCSV(days)], backupFileName(date, "csv"), { type: "text/csv" }),
-      ];
-      if (await shareOrDownload(files)) {
+      const how = await shareOrDownload(files);
+      if (how) {
         await app.storage.setMeta("lastBackupAt", new Date().toISOString());
-        message = { cls: "ok", text: "Sauvegarde créée ✓. Vérifie qu'elle est bien arrivée à destination." };
+        message = how === "partage"
+          ? { cls: "ok", text: "Sauvegarde créée ✓. Vérifie qu'elle est bien arrivée à destination." }
+          : { cls: "ok", text: "Sauvegarde téléchargée ✓ dans Téléchargements (Chrome › ⋮ › Téléchargements). Pense à l'envoyer sur ton Drive ou par mail." };
       } else {
         message = { cls: "dirty", text: "Sauvegarde annulée." };
       }
