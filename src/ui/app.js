@@ -7,8 +7,11 @@ import { renderEntry } from "./entry.js";
 import { renderHistory } from "./history.js";
 import { renderAnalysis } from "./analysis-view.js";
 import { renderBackup } from "./backup-view.js";
+import { renderFoods } from "./foods-view.js";
+import { runMigrations } from "../migrations.js";
 
-const VIEWS = { saisie: renderEntry, historique: renderHistory, analyse: renderAnalysis, sauvegarde: renderBackup };
+// « aliments » est un sous-écran de la saisie, sans onglet propre.
+const VIEWS = { saisie: renderEntry, historique: renderHistory, analyse: renderAnalysis, sauvegarde: renderBackup, aliments: renderFoods };
 const LEAVE_MSG = "Des modifications de cette journée ne sont pas enregistrées. Quitter quand même ?";
 
 const app = {
@@ -17,6 +20,15 @@ const app = {
   updateReady: null, // fonction pour activer une nouvelle version
   async customFoods() {
     return (await this.storage.getMeta("customFoods")) ?? [];
+  },
+  /** Listes d'aliments : perso ajoutés et aliments de base retirés. */
+  async foodLists() {
+    return { customFoods: await this.customFoods(), hiddenFoods: (await this.storage.getMeta("hiddenFoods")) ?? [] };
+  },
+  async saveFoodLists(lists) {
+    await this.storage.setMeta("customFoods", lists.customFoods);
+    await this.storage.setMeta("hiddenFoods", lists.hiddenFoods);
+    return lists;
   },
   go(hash) {
     location.hash = hash;
@@ -42,7 +54,7 @@ async function route() {
   currentHash = location.hash || "#saisie";
   const { tab, arg } = parseHash();
   for (const a of $$("#tabs a")) {
-    if (a.dataset.tab === tab) a.setAttribute("aria-current", "page");
+    if (a.dataset.tab === (tab === "aliments" ? "saisie" : tab)) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");
   }
   const view = $("#view");
@@ -63,6 +75,9 @@ async function refreshBanners() {
     out.push(html`<div class="banner"><span>Une nouvelle version de l'app est prête.</span><button data-act="update">Mettre à jour</button></div>`);
   }
   try {
+    // Message ponctuel (ex. après une migration), affiché jusqu'à ce qu'elle touche OK.
+    const notice = await app.storage.getMeta("notice");
+    if (notice) out.unshift(html`<div class="banner"><span>${notice}</span><button data-act="notice-ok">OK</button></div>`);
     const days = await app.storage.listDays();
     if (days.length) {
       const last = await app.storage.getMeta("lastBackupAt");
@@ -77,6 +92,8 @@ async function refreshBanners() {
   box.innerHTML = out.join("");
   const btn = $("[data-act=update]", box);
   if (btn) btn.onclick = () => app.updateReady();
+  const ok = $("[data-act=notice-ok]", box);
+  if (ok) ok.onclick = async () => { await app.storage.setMeta("notice", null); refreshBanners(); };
 }
 
 function registerServiceWorker() {
@@ -113,6 +130,14 @@ async function start() {
     return;
   }
   app.storage.persistence({ request: true }).catch(() => {});
+  try {
+    if ((await runMigrations(app.storage)).includes("nettoyage-aliments-2026-11")) {
+      await app.storage.setMeta("notice", "Ta liste d'aliments a été nettoyée comme convenu (blé regroupé dans Gluten, laitages, sans gluten, charcuterie…). Une copie de tes données d'avant est conservée.");
+    }
+  } catch (err) {
+    console.error(err);
+    await app.storage.setMeta("notice", `La mise à jour de ta liste d'aliments a échoué (${err.message}). Elle sera retentée à la prochaine ouverture.`).catch(() => {});
+  }
   window.addEventListener("hashchange", route);
   window.addEventListener("beforeunload", (e) => { if (app.dirty) e.preventDefault(); });
   registerServiceWorker();

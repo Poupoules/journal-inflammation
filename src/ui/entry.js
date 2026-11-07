@@ -1,8 +1,9 @@
 // Écran de saisie d'une journée (aujourd'hui ou un jour passé).
 import {
-  ALCOHOL_GLASSES, ALCOHOL_TYPES, CUSTOM_FOOD_PREFIX, FOODS, INTENSITY_LABELS, MOODS, PAIN_INTENSITIES,
-  PAIN_SITES, SKIN_SITES, SLEEP_QUALITIES, SPORTS, YES_NO,
+  ALCOHOL_GLASSES, ALCOHOL_TYPES, FOODS, INTENSITY_LABELS, MOODS, PAIN_INTENSITIES,
+  PAIN_SITES, SKIN_SITES, SLEEP_QUALITIES, SPORTS, YES_NO, labelOf,
 } from "../config.js";
+import { foodIdFor, showInList, visibleFoods } from "../foods.js";
 import { addDays, diffDays, formatLong, formatShort, isISODate, today } from "../dates.js";
 import { emptyEntry, sleepHours, toggleChoice } from "../model.js";
 import { $, html } from "./dom.js";
@@ -62,7 +63,7 @@ export async function renderEntry(view, app, arg) {
   let draft = clone(stored ?? emptyEntry(date));
   const yesterday = all.find((e) => e.date === addDays(date, -1));
   const lastInjectionBefore = all.filter((e) => e.injection === true && e.date < date).map((e) => e.date).pop() ?? null;
-  let customFoods = await app.customFoods();
+  let lists = await app.foodLists();
   let status = stored ? { cls: "", text: "Journée déjà enregistrée : tu peux la modifier." } : { cls: "", text: "Nouvelle journée." };
   app.dirty = false;
 
@@ -85,10 +86,11 @@ export async function renderEntry(view, app, arg) {
     const d = draft;
     const hours = sleepHours(d.sleep);
     const painActive = d.pain.sites.length && !d.pain.sites.includes("ras");
+    // Un aliment retiré de la liste reste affiché s'il est coché ce jour-là.
+    const shown = visibleFoods(lists);
     const foodOptions = [
-      ...FOODS,
-      ...[...new Set([...customFoods, ...d.foods.filter((f) => f.startsWith(CUSTOM_FOOD_PREFIX))])]
-        .map((id) => ({ id, label: id.slice(CUSTOM_FOOD_PREFIX.length) })),
+      ...shown,
+      ...d.foods.filter((f) => !shown.some((s) => s.id === f)).map((id) => ({ id, label: labelOf(FOODS, id) })),
     ];
     root.innerHTML = html`
       <div class="datebar">
@@ -157,6 +159,7 @@ export async function renderEntry(view, app, arg) {
             <input type="text" data-input="newFood" maxlength="40" placeholder="Ex. : fraises"></label>
           <button type="button" class="btn secondary" data-act="add-food">Ajouter</button>
         </div>
+        <p class="hint"><a href="#aliments">Gérer ma liste</a> : retirer ou regrouper des aliments.</p>
       </section>
 
       <section class="card" aria-labelledby="h-alcohol">
@@ -209,21 +212,15 @@ export async function renderEntry(view, app, arg) {
 
   async function addFood() {
     const input = $("[data-input=newFood]", root);
-    const name = input.value.trim().replace(/\s+/g, " ");
-    if (!name) return;
-    const known = FOODS.find((f) => f.label.toLowerCase() === name.toLowerCase());
-    const id = known ? known.id : CUSTOM_FOOD_PREFIX + name.charAt(0).toUpperCase() + name.slice(1);
-    if (!known && !customFoods.some((f) => f.toLowerCase() === id.toLowerCase())) {
-      customFoods = [...customFoods, id];
-      try {
-        await app.storage.setMeta("customFoods", customFoods);
-      } catch (err) {
-        setStatus("err", `Impossible d'ajouter l'aliment : ${err.message}`);
-        return;
-      }
+    if (!input.value.trim()) return;
+    const id = foodIdFor(input.value, lists);
+    try {
+      lists = await app.saveFoodLists(showInList(id, lists));
+    } catch (err) {
+      setStatus("err", `Impossible d'ajouter l'aliment : ${err.message}`);
+      return;
     }
-    const existing = customFoods.find((f) => f.toLowerCase() === id.toLowerCase()) ?? id;
-    if (!draft.foods.includes(existing)) { draft.foods = [...draft.foods, existing]; markDirty(); }
+    if (!draft.foods.includes(id)) { draft.foods = [...draft.foods, id]; markDirty(); }
     render();
   }
 

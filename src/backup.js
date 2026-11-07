@@ -9,12 +9,13 @@ import { daysSinceInjection } from "./analysis.js";
 export const APP_ID = "journal-inflammation";
 export const BACKUP_FORMAT = 1;
 
-export function buildBackup(days, { customFoods = [], now = new Date() } = {}) {
+export function buildBackup(days, { customFoods = [], hiddenFoods = [], now = new Date() } = {}) {
   return {
     app: APP_ID,
     format: BACKUP_FORMAT,
     exportedAt: now.toISOString(),
     customFoods,
+    hiddenFoods,
     days,
   };
 }
@@ -46,7 +47,8 @@ export function parseBackup(text) {
     }
   }
   const customFoods = Array.isArray(data.customFoods) ? data.customFoods.filter((f) => typeof f === "string") : [];
-  return { days, customFoods, rejected, exportedAt: data.exportedAt ?? null };
+  const hiddenFoods = Array.isArray(data.hiddenFoods) ? data.hiddenFoods.filter((f) => typeof f === "string") : [];
+  return { days, customFoods, hiddenFoods, rejected, exportedAt: data.exportedAt ?? null };
 }
 
 /**
@@ -114,12 +116,12 @@ export function toCSV(days) {
  * certains types de fichiers (pas le .json) : la sauvegarde est donc un .txt
  * (contenu JSON) et le tableur un .csv, tous deux acceptés par le menu de partage.
  */
-export function backupFiles(days, { customFoods = [], date, now = new Date() }) {
+export function backupFiles(days, { customFoods = [], hiddenFoods = [], date, now = new Date() }) {
   return [
     {
       name: `journal-inflammation-${date}-sauvegarde.txt`,
       type: "text/plain",
-      content: JSON.stringify(buildBackup(days, { customFoods, now }), null, 1),
+      content: JSON.stringify(buildBackup(days, { customFoods, hiddenFoods, now }), null, 1),
     },
     { name: `journal-inflammation-${date}-tableur.csv`, type: "text/csv", content: toCSV(days) },
   ];

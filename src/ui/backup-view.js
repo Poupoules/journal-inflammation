@@ -47,7 +47,7 @@ export async function renderBackup(view, app) {
     const days = await app.storage.listDays();
     const last = await app.storage.getMeta("lastBackupAt");
     const persistence = await app.storage.persistence();
-    files = backupFiles(days, { customFoods: await app.customFoods(), date: today() })
+    files = backupFiles(days, { ...(await app.foodLists()), date: today() })
       .map((f) => new File([f.content], f.name, { type: f.type }));
     root.innerHTML = html`
       <div class="card stack">
@@ -135,9 +135,11 @@ export async function renderBackup(view, app) {
     try {
       // Les fiches gardent leur date de modification d'origine.
       await app.storage.putDays([...plan.add, ...plan.replace]);
-      const current = await app.customFoods();
-      const merged = [...new Set([...current, ...parsed.customFoods])];
-      if (merged.length !== current.length) await app.storage.setMeta("customFoods", merged);
+      const current = await app.foodLists();
+      await app.saveFoodLists({
+        customFoods: [...new Set([...current.customFoods, ...parsed.customFoods])],
+        hiddenFoods: [...new Set([...current.hiddenFoods, ...parsed.hiddenFoods])],
+      });
       message = { cls: "ok", text: `Restauration terminée et vérifiée ✓ (${plan.add.length + plan.replace.length} jours).` };
     } catch (err) {
       console.error(err);
