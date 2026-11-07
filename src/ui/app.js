@@ -8,7 +8,7 @@ import { renderHistory } from "./history.js";
 import { renderAnalysis } from "./analysis-view.js";
 import { renderBackup } from "./backup-view.js";
 import { renderFoods } from "./foods-view.js";
-import { runMigrations } from "../migrations.js";
+import { MIGRATIONS, runMigrations } from "../migrations.js";
 
 // « aliments » est un sous-écran de la saisie, sans onglet propre.
 const VIEWS = { saisie: renderEntry, historique: renderHistory, analyse: renderAnalysis, sauvegarde: renderBackup, aliments: renderFoods };
@@ -131,8 +131,10 @@ async function start() {
   }
   app.storage.persistence({ request: true }).catch(() => {});
   try {
-    if ((await runMigrations(app.storage)).includes("nettoyage-aliments-2026-11")) {
-      await app.storage.setMeta("notice", "Ta liste d'aliments a été nettoyée comme convenu (blé regroupé dans Gluten, laitages, sans gluten, charcuterie…). Une copie de tes données d'avant est conservée.");
+    const applied = await runMigrations(app.storage);
+    const messages = MIGRATIONS.filter((m) => applied.includes(m.id)).map((m) => m.message);
+    if (messages.length) {
+      await app.storage.setMeta("notice", `${messages.join(" ")} Une copie de tes données d'avant est conservée.`);
     }
   } catch (err) {
     console.error(err);

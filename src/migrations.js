@@ -30,6 +30,7 @@ export const MIGRATIONS = [
   {
     // Nettoyage de la liste d'aliments validé le 7 novembre 2026.
     id: "nettoyage-aliments-2026-11",
+    message: "Ta liste d'aliments a été nettoyée comme convenu (blé regroupé dans Gluten, laitages, sans gluten, charcuterie…).",
     run(state, now) {
       const charcuterie = tagFromNotes(state.days, /lardon|jambon/i, "charcuterie", now);
       const days = state.days.map((d) => charcuterie.find((c) => c.date === d.date) ?? d);
@@ -51,6 +52,14 @@ export const MIGRATIONS = [
       const changed = new Map(charcuterie.map((d) => [d.date, d]));
       for (const d of res.changedDays) changed.set(d.date, d);
       return { ...res, changedDays: [...changed.values()].sort((a, b) => a.date.localeCompare(b.date)) };
+    },
+  },
+  {
+    // Retraits demandés le 8 novembre 2026 (les journées passées gardent ces aliments).
+    id: "retrait-legumes-2026-11",
+    message: "« Légumes » et « Celeri rave » ont été retirés de ta liste d'aliments.",
+    run(state, now) {
+      return applyFoodCleanup(state, { removes: ["legumes", "perso:Celeri rave"] }, now);
     },
   },
 ];
