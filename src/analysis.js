@@ -38,7 +38,7 @@ export function binaryFactors(entries = []) {
     { id: "alcool:3+", group: "Alcool", label: "Plus de 2 verres", value: (e) => e.alcohol.glasses === "3+" },
     ...MOODS.map((m) => ({ id: `humeur:${m.id}`, group: "Humeur", label: m.label, value: (e) => (moodKnown(e) ? e.moods.includes(m.id) : null) })),
     { id: "sommeil:moyen", group: "Sommeil", label: "Sommeil moyen", value: (e) => (e.sleep.quality ? e.sleep.quality === "moyen" : null) },
-    { id: "cortisone", group: "Traitement", label: "Cortisone", value: (e) => e.cortisone },
+    { id: "cortisone", group: "Traitement", label: "Crème cortisone (psoriasis)", value: (e) => e.cortisone },
     { id: "injection", group: "Traitement", label: "Jour d'injection", value: (e) => e.injection },
     { id: "regles", group: "Cycle", label: "Règles", value: (e) => e.period },
   ];

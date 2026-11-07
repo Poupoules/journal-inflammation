@@ -142,7 +142,7 @@ export async function renderEntry(view, app, arg) {
 
       <section class="card" aria-labelledby="h-treat">
         <h2 id="h-treat">Traitement</h2>
-        <h3>Cortisone</h3>
+        <h3>Crème cortisone (psoriasis)</h3>
         ${single("cortisone", YES_NO, d.cortisone)}
         <h3>Injection</h3>
         ${single("injection", YES_NO, d.injection)}
