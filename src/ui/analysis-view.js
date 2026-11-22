@@ -2,14 +2,14 @@
 // sur N », phases d'injection, et ce qui ne peut pas encore être analysé.
 import { ANALYSIS } from "../config.js";
 import { addDays, diffDays, formatShort, range, today } from "../dates.js";
-import { OUTCOMES, WINDOW, analyse } from "../analysis.js";
+import { OUTCOMES, WINDOW, analyse, verdict } from "../analysis.js";
 import { painScore } from "../model.js";
 import { html } from "./dom.js";
 
 let selected = "douleur"; // mesure choisie, conservée pendant la session
 
 const plural = (n, word) => `${n} ${word}${n > 1 ? "s" : ""}`;
-const times = (g) => `${g.yes} fois sur ${g.n}`;
+const times = (g) => `${g.yes} fois sur ${g.n} (${Math.round((100 * g.yes) / g.n)} %)`;
 // « 7 nov. » termine déjà la phrase : pas de second point.
 const dot = (s) => (s.endsWith(".") ? s : `${s}.`);
 const MAX_LEADS = 5;
@@ -59,11 +59,13 @@ function summaryLines(r, lastDate) {
 }
 
 function leadSentence(o, f) {
-  const sens = f.diff > 0 ? html`<span class="worse">plus souvent</span>` : html`<span class="better">moins souvent</span>`;
+  // Rouge : plus souvent que les autres jours ; vert : moins souvent.
+  const cls = f.diff > 0 ? "worse" : f.diff < 0 ? "better" : "";
   return html`<div class="factor">
     <div class="factor-head"><strong>${f.label}</strong><span class="grp">${f.group}</span></div>
-    <p class="lead">Dans les ${WINDOW} jours après « ${f.label} », tu as eu ${o.noun} <strong>${times(f.with)}</strong>.
-      Après les autres jours : ${times(f.without)}. Donc ${sens}.
+    <p class="lead">Dans les ${WINDOW} jours après « ${f.label} », tu as eu ${o.noun} <strong class="${cls}">${times(f.with)}</strong>.
+      Après les autres jours : ${times(f.without)}.
+      <span class="verdict">${verdict(f.diff)}</span>
       ${f.fragile ? html`<span class="fragile">à confirmer</span>` : ""}</p>
   </div>`;
 }

@@ -163,3 +163,5 @@ details summary { cursor: pointer; color: var(--ac); font-size: .9rem; padding: 
 .cal-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: .78rem; color: var(--mut); margin: 8px 0 0; }
 .cal-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
 .lead { margin: 4px 0 0; font-size: .9rem; }
+.verdict { font-weight: 600; white-space: nowrap; }
+.verdict::before { content: "→ "; }

@@ -1,7 +1,7 @@
 // Écran de saisie d'une journée (aujourd'hui ou un jour passé).
 import {
   ALCOHOL_GLASSES, ALCOHOL_TYPES, FOODS, INTENSITY_LABELS, MEALS, MOODS, PAIN_INTENSITIES,
-  PAIN_SITES, PROTEINS, SKIN_SITES, SLEEP_QUALITIES, SPORTS, YES_NO, labelOf,
+  MEAL_PROTEINS, PAIN_SITES, SKIN_SITES, SLEEP_QUALITIES, SPORTS, YES_NO, labelOf,
 } from "../config.js";
 import { foodIdFor, showInList, visibleFoods } from "../foods.js";
 import { weeklyProteins } from "../proteins.js";
@@ -158,7 +158,8 @@ export async function renderEntry(view, app, arg) {
 
       <section class="card" aria-labelledby="h-protein">
         <h2 id="h-protein">Protéines</h2>
-        ${MEALS.map((m) => html`<h3>${m.label}</h3>${single(`protein-${m.id}`, PROTEINS, d.proteins[m.id])}`)}
+        <p class="hint">NA : pas de protéine à ce repas.</p>
+        ${MEALS.map((m) => html`<h3>${m.label}</h3>${single(`protein-${m.id}`, MEAL_PROTEINS, d.proteins[m.id])}`)}
         <h3>Cette semaine (lundi → dimanche)</h3>
         ${weeklyProteins(all, date, d).map((p) => html`<div class="factor-line">
           <span>${p.label}</span>

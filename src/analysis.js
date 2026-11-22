@@ -8,6 +8,15 @@ import { painScore, skinScore, sleepHours } from "./model.js";
 export const WINDOW = 3;
 const MIN_FOLLOW = 2; // jours renseignés minimum dans la fenêtre
 export const NOTABLE = 0.25; // écart de fréquence à partir duquel c'est une « piste »
+export const OBVIOUS = 0.5; // au-delà de cet écart, la piste est « évidente »
+
+/** Verdict selon l'écart entre les deux fréquences (en points de pourcentage). */
+export function verdict(diff) {
+  // Arrondi pour éviter qu'un écart de 25 points tombe à 24,999… par calcul.
+  const gap = Math.round(Math.abs(diff) * 1e6) / 1e6;
+  if (!(gap >= NOTABLE)) return "pas une piste";
+  return gap > OBVIOUS ? "piste évidente" : "piste probable";
+}
 
 /** Mesures : `present(e)` vaut true, false, ou null si non renseigné. */
 export const OUTCOMES = [
@@ -199,7 +208,7 @@ export function analyse(entries, outcomeId = "douleur") {
     days: entries.length,
     enoughDays: entries.length >= ANALYSIS.minDays,
     summary: summary(entries),
-    leads: results.filter((r) => Math.abs(r.diff) >= NOTABLE),
+    leads: results.filter((r) => verdict(r.diff) !== "pas une piste"),
     factors: results,
     unanalysable: unanalysable(entries, outcome, factors, new Set(results.map((r) => r.id))),
     injections: entries.filter((e) => e.injection === true).map((e) => e.date),

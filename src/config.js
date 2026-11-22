@@ -91,6 +91,12 @@ export const PROTEINS = [
   { id: "oeufs", label: "Œufs", weeklyMax: 7 },
 ];
 
+// Choix possibles pour un repas : une protéine, ou « NA » = pas de protéine
+// à ce repas (différent d’un repas non renseigné). NA ne compte dans aucun
+// compteur et rend « non » chaque protéine à l’analyse.
+export const NO_PROTEIN = { id: "aucune", label: "NA" };
+export const MEAL_PROTEINS = [...PROTEINS, NO_PROTEIN];
+
 export const ALCOHOL_TYPES = [
   { id: "biere", label: "Bière" },
   { id: "vin", label: "Vin" },

@@ -3,7 +3,7 @@
 // jamais une valeur par défaut qui fausserait l'analyse.
 import {
   ALCOHOL_GLASSES, ALCOHOL_TYPES, CUSTOM_FOOD_PREFIX, FOODS, MOODS, PAIN_INTENSITIES,
-  PAIN_SITES, PROTEINS, SKIN_SITES, SLEEP_QUALITIES, SPORTS,
+  MEAL_PROTEINS, PAIN_SITES, SKIN_SITES, SLEEP_QUALITIES, SPORTS,
 } from "./config.js";
 import { isISODate } from "./dates.js";
 
@@ -41,7 +41,7 @@ const VALID = {
   skin: ids(SKIN_SITES),
   foods: ids(FOODS),
   alcoholTypes: ids(ALCOHOL_TYPES),
-  proteins: ids(PROTEINS),
+  proteins: ids(MEAL_PROTEINS),
   glasses: ids(ALCOHOL_GLASSES),
   quality: ids(SLEEP_QUALITIES),
 };

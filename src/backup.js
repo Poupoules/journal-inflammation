@@ -1,6 +1,6 @@
 // Sauvegarde (JSON complet, restaurable) et export tableur (CSV).
 import {
-  ALCOHOL_GLASSES, ALCOHOL_TYPES, FOODS, MOODS, PAIN_INTENSITIES, PAIN_SITES, PROTEINS, SKIN_SITES,
+  ALCOHOL_GLASSES, ALCOHOL_TYPES, FOODS, MOODS, PAIN_INTENSITIES, MEAL_PROTEINS, PAIN_SITES, SKIN_SITES,
   SLEEP_QUALITIES, SPORTS, labelOf,
 } from "./config.js";
 import { normalizeEntry, sameContent, skinScore, sleepHours } from "./model.js";
@@ -86,8 +86,8 @@ const CSV_COLUMNS = [
   ["cortisone", (e) => yesNo(e.cortisone)],
   ["injection", (e) => yesNo(e.injection)],
   ["jours_depuis_injection", (e, ctx) => ctx.get(e.date)],
-  ["proteine_midi", (e) => e.proteins.midi && labelOf(PROTEINS, e.proteins.midi)],
-  ["proteine_soir", (e) => e.proteins.soir && labelOf(PROTEINS, e.proteins.soir)],
+  ["proteine_midi", (e) => e.proteins.midi && labelOf(MEAL_PROTEINS, e.proteins.midi)],
+  ["proteine_soir", (e) => e.proteins.soir && labelOf(MEAL_PROTEINS, e.proteins.soir)],
   ["aliments", (e) => e.foods.map((f) => labelOf(FOODS, f)).join("|")],
   ["repas", (e) => e.mealNotes],
   ["alcool", (e) => e.alcohol.types.map((t) => labelOf(ALCOHOL_TYPES, t)).join("|")],
