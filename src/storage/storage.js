@@ -22,11 +22,20 @@ export async function openStorage(options) {
 
 /**
  * Enveloppe commune : normalise et horodate avant écriture, puis relit la
- * fiche pour vérifier qu'elle a bien été enregistrée.
+ * fiche pour vérifier qu'elle a bien été enregistrée. À la lecture, les
+ * fiches écrites par une ancienne version sont complétées des champs ajoutés
+ * depuis (ex. protéines), pour que le reste de l'app trouve toujours la même forme.
  */
 export function withVerification(backend, now = () => new Date().toISOString()) {
   return {
     ...backend,
+    async getDay(date) {
+      const e = await backend.getDay(date);
+      return e ? normalizeEntry(e) : null;
+    },
+    async listDays() {
+      return (await backend.listDays()).map(normalizeEntry);
+    },
     async putDay(raw) {
       const entry = { ...normalizeEntry(raw), updatedAt: now() };
       await backend.putDay(entry);
