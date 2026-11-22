@@ -18,7 +18,7 @@ const MULTI = {
     set: (d, v) => {
       d.pain.sites = v;
       if (!v.includes("autre")) d.pain.other = "";
-      if (!v.length || v.includes("ras")) d.pain.intensity = null;
+      if (!v.length) d.pain.intensity = null;
     },
     options: PAIN_SITES,
   },
@@ -89,7 +89,7 @@ export async function renderEntry(view, app, arg) {
   function render() {
     const d = draft;
     const hours = sleepHours(d.sleep);
-    const painActive = d.pain.sites.length && !d.pain.sites.includes("ras");
+    const painActive = d.pain.sites.length > 0;
     // Un aliment retiré de la liste reste affiché s'il est coché ce jour-là.
     const shown = visibleFoods(lists);
     const foodOptions = [
@@ -130,6 +130,7 @@ export async function renderEntry(view, app, arg) {
       <section class="card" aria-labelledby="h-pain">
         <h2 id="h-pain">Douleurs</h2>
         ${multi("painSites", PAIN_SITES, d.pain.sites)}
+        <p class="hint">Rien de coché = pas de douleur ce jour-là.</p>
         ${d.pain.sites.includes("autre") ? html`<label class="field" style="margin-top:10px">Autre endroit
           <input type="text" data-input="painOther" maxlength="200" value="${d.pain.other}" placeholder="Ex. : genou droit"></label>` : ""}
         ${painActive ? html`<h3>Intensité</h3>${single("painIntensity", PAIN_INTENSITIES, d.pain.intensity)}` : ""}
@@ -138,7 +139,7 @@ export async function renderEntry(view, app, arg) {
       <section class="card" aria-labelledby="h-skin">
         <h2 id="h-skin">Psoriasis</h2>
         ${multi("skin", SKIN_SITES, d.skin)}
-        <p class="hint">RAS = pas de plaque ce jour-là.</p>
+        <p class="hint">Rien de coché = pas de plaque ce jour-là.</p>
       </section>
 
       <section class="card" aria-labelledby="h-flare">

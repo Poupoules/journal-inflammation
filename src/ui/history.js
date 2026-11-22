@@ -8,11 +8,9 @@ import { html } from "./dom.js";
 function tags(e, sinceInjection) {
   const t = [];
   if (e.flare) t.push(html`<span class="tag flare">crise</span>`);
-  if (e.pain.sites.includes("ras")) t.push(html`<span class="tag">pas de douleur</span>`);
-  else if (e.pain.intensity) t.push(html`<span class="tag">douleur ${labelOf(PAIN_INTENSITIES, e.pain.intensity).toLowerCase()}</span>`);
+  if (e.pain.sites.length) t.push(html`<span class="tag">douleur${e.pain.intensity ? ` ${labelOf(PAIN_INTENSITIES, e.pain.intensity).toLowerCase()}` : ""}</span>`);
   const zones = skinScore(e);
-  if (zones === 0) t.push(html`<span class="tag">pas de plaque</span>`);
-  else if (zones) t.push(html`<span class="tag">psoriasis ${zones} zone${zones > 1 ? "s" : ""}</span>`);
+  if (zones) t.push(html`<span class="tag">psoriasis ${zones} zone${zones > 1 ? "s" : ""}</span>`);
   if (e.period) t.push(html`<span class="tag">règles</span>`);
   if (e.injection) t.push(html`<span class="tag">injection</span>`);
   else if (sinceInjection !== undefined) t.push(html`<span class="tag">injection il y a ${sinceInjection} j</span>`);

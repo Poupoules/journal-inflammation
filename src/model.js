@@ -71,9 +71,8 @@ export function normalizeEntry(raw) {
   e.sports = list(raw.sports, (s) => VALID.sports.has(s));
 
   e.pain.sites = exclusive(list(raw.pain?.sites, (s) => VALID.painSites.has(s)), PAIN_SITES);
-  const ras = e.pain.sites.includes("ras");
   e.pain.other = e.pain.sites.includes("autre") ? text(raw.pain?.other) : "";
-  e.pain.intensity = ras || !e.pain.sites.length ? null : pick(raw.pain?.intensity, VALID.painIntensity);
+  e.pain.intensity = !e.pain.sites.length ? null : pick(raw.pain?.intensity, VALID.painIntensity);
 
   e.skin = exclusive(list(raw.skin, (s) => VALID.skin.has(s)), SKIN_SITES);
   e.flare = bool(raw.flare);
@@ -118,17 +117,19 @@ export function sleepHours(sleep) {
   return Math.round((d / 60) * 100) / 100;
 }
 
-/** Score de douleur : RAS = 0, légère 1, moyenne 2, intense 3 ; null si non renseigné. */
+/**
+ * Score de douleur d'une journée enregistrée : aucun endroit coché = 0 (pas de
+ * douleur), sinon légère 1, moyenne 2, intense 3 (1 si l'intensité manque).
+ * Les anciens « RAS » sont ignorés à la lecture et deviennent donc 0.
+ */
 export function painScore(e) {
-  if (e.pain.sites.includes("ras")) return 0;
-  const i = PAIN_INTENSITIES.find((p) => p.id === e.pain.intensity);
-  return i ? i.score : null;
+  if (!e.pain.sites.length) return 0;
+  return PAIN_INTENSITIES.find((p) => p.id === e.pain.intensity)?.score ?? 1;
 }
 
-/** Nombre de zones de psoriasis : RAS = 0 ; null si rien n'a été coché. */
+/** Nombre de zones de psoriasis d'une journée enregistrée (aucune = 0). */
 export function skinScore(e) {
-  if (e.skin.includes("ras")) return 0;
-  return e.skin.length ? e.skin.length : null;
+  return e.skin.length;
 }
 
 /** Compare deux fiches sans tenir compte de la date de modification. */

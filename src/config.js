@@ -25,7 +25,6 @@ export const SPORTS = [
 ];
 
 export const PAIN_SITES = [
-  { id: "ras", label: "RAS", exclusive: true },
   { id: "bas-dos", label: "Bas du dos" },
   { id: "sacro-iliaque", label: "Sacro-iliaque" },
   { id: "aine", label: "Aine" },
@@ -40,7 +39,6 @@ export const PAIN_INTENSITIES = [
 ];
 
 export const SKIN_SITES = [
-  { id: "ras", label: "RAS", exclusive: true },
   { id: "visage", label: "Visage" },
   { id: "yeux", label: "Yeux" },
   { id: "cuir-chevelu", label: "Cuir chevelu" },
