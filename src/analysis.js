@@ -1,6 +1,6 @@
 // Analyse locale, pensée pour être lue en phrases : « dans les 3 jours après
 // tel facteur, tu as eu des douleurs X fois sur N ». Fonctions pures.
-import { ALCOHOL_TYPES, ANALYSIS, CUSTOM_FOOD_PREFIX, FOODS, INTENSITY_LABELS, MOODS, SPORTS, labelOf } from "./config.js";
+import { ALCOHOL_TYPES, ANALYSIS, CUSTOM_FOOD_PREFIX, FOODS, INTENSITY_LABELS, MEALS, MOODS, PROTEINS, SPORTS, labelOf } from "./config.js";
 import { addDays, diffDays } from "./dates.js";
 import { painScore, skinScore, sleepHours } from "./model.js";
 
@@ -38,6 +38,14 @@ export function binaryFactors(entries = [], outcomeId = "douleur") {
     ...foodIds.map((id) => ({
       id: `aliment:${id}`, group: "Alimentation", label: labelOf(FOODS, id),
       value: (e) => (ateKnown(e) ? e.foods.includes(id) : null),
+    })),
+    // Protéine à midi ou le soir ; inconnu si aucun repas n'est renseigné.
+    ...PROTEINS.map((p) => ({
+      id: `proteine:${p.id}`, group: "Protéines", label: `Protéine : ${p.label.toLowerCase()}`,
+      value: (e) => {
+        const meals = MEALS.map((m) => e.proteins?.[m.id]).filter(Boolean);
+        return meals.length ? meals.includes(p.id) : null;
+      },
     })),
     { id: "sport", group: "Sport", label: "Sport (quel qu'il soit)", value: (e) => e.sports.length > 0 },
     ...SPORTS.map((s) => ({ id: `sport:${s.id}`, group: "Sport", label: s.label, value: (e) => e.sports.includes(s.id) })),

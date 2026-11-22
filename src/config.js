@@ -52,7 +52,7 @@ export const SKIN_SITES = [
 ];
 
 export const FOODS = [
-  { id: "biscuit", label: "Biscuit" },
+  { id: "biscuit", label: "Dessert avec gluten" },
   { id: "chocolat-noir", label: "Chocolat noir" },
   { id: "chips", label: "Chips" },
   { id: "charcuterie", label: "Charcuterie" },
@@ -78,6 +78,20 @@ export const FOODS = [
 
 // Préfixe des aliments ajoutés par l'utilisatrice : "perso:Fraises".
 export const CUSTOM_FOOD_PREFIX = "perso:";
+
+// Protéine principale de chaque repas, avec un maximum par semaine (lundi → dimanche).
+export const MEALS = [
+  { id: "midi", label: "Midi" },
+  { id: "soir", label: "Soir" },
+];
+
+export const PROTEINS = [
+  { id: "viande-rouge", label: "Viande rouge", weeklyMax: 3 },
+  { id: "viande-blanche", label: "Viande blanche", weeklyMax: 5 },
+  { id: "poisson", label: "Poisson", weeklyMax: 2 },
+  { id: "vegetal", label: "Végétal", weeklyMax: null },
+  { id: "oeufs", label: "Œufs", weeklyMax: 7 },
+];
 
 export const ALCOHOL_TYPES = [
   { id: "biere", label: "Bière" },

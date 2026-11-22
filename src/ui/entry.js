@@ -1,9 +1,10 @@
 // Écran de saisie d'une journée (aujourd'hui ou un jour passé).
 import {
-  ALCOHOL_GLASSES, ALCOHOL_TYPES, FOODS, INTENSITY_LABELS, MOODS, PAIN_INTENSITIES,
-  PAIN_SITES, SKIN_SITES, SLEEP_QUALITIES, SPORTS, YES_NO, labelOf,
+  ALCOHOL_GLASSES, ALCOHOL_TYPES, FOODS, INTENSITY_LABELS, MEALS, MOODS, PAIN_INTENSITIES,
+  PAIN_SITES, PROTEINS, SKIN_SITES, SLEEP_QUALITIES, SPORTS, YES_NO, labelOf,
 } from "../config.js";
 import { foodIdFor, showInList, visibleFoods } from "../foods.js";
+import { weeklyProteins } from "../proteins.js";
 import { addDays, diffDays, formatLong, formatShort, isISODate, today } from "../dates.js";
 import { emptyEntry, sleepHours, toggleChoice } from "../model.js";
 import { $, html } from "./dom.js";
@@ -38,6 +39,9 @@ const SINGLE = {
   flare: { get: (d) => d.flare, set: (d, v) => { d.flare = v; } },
   cortisone: { get: (d) => d.cortisone, set: (d, v) => { d.cortisone = v; } },
   injection: { get: (d) => d.injection, set: (d, v) => { d.injection = v; } },
+  ...Object.fromEntries(MEALS.map((m) => [`protein-${m.id}`, {
+    get: (d) => d.proteins[m.id], set: (d, v) => { d.proteins[m.id] = v; },
+  }])),
 };
 
 const clone = (o) => structuredClone(o);
@@ -151,9 +155,26 @@ export async function renderEntry(view, app, arg) {
         <p class="hint">${injectionInfo()}</p>
       </section>
 
+      <section class="card" aria-labelledby="h-protein">
+        <h2 id="h-protein">Protéines</h2>
+        ${MEALS.map((m) => html`<h3>${m.label}</h3>${single(`protein-${m.id}`, PROTEINS, d.proteins[m.id])}`)}
+        <h3>Cette semaine (lundi → dimanche)</h3>
+        ${weeklyProteins(all, date, d).map((p) => html`<div class="factor-line">
+          <span>${p.label}</span>
+          <span>${p.max === null
+            ? `${p.count} fois`
+            : p.left < 0
+              ? html`<span class="worse">${p.count} sur ${p.max} : dépassé de ${-p.left}</span>`
+              : html`${p.count} sur ${p.max} · <strong>${p.left ? `encore ${p.left}` : "plus aucun"}</strong>`}</span>
+        </div>`)}
+      </section>
+
       <section class="card" aria-labelledby="h-food">
         <h2 id="h-food">Alimentation</h2>
         ${multi("foods", foodOptions, d.foods)}
+        <label class="field" style="margin-top:10px">Ce que j'ai mangé
+          <textarea data-input="mealNotes" rows="3" maxlength="2000"
+            placeholder="Matin : …&#10;Midi : …&#10;Soir : …">${d.mealNotes}</textarea></label>
         <div class="field-row" style="margin-top:10px">
           <label class="field">Ajouter un aliment à ta liste
             <input type="text" data-input="newFood" maxlength="40" placeholder="Ex. : fraises"></label>
@@ -255,6 +276,7 @@ export async function renderEntry(view, app, arg) {
     const key = ev.target.dataset.input;
     if (key === "painOther") draft.pain.other = ev.target.value;
     else if (key === "notes") draft.notes = ev.target.value;
+    else if (key === "mealNotes") draft.mealNotes = ev.target.value;
     else return;
     if (!app.dirty) { markDirty(); setStatus(status.cls, status.text); }
   });

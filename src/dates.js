@@ -32,6 +32,11 @@ export function diffDays(a, b) {
   return Math.round((parse(b) - parse(a)) / 86400000);
 }
 
+/** Lundi de la semaine qui contient `s`. */
+export function weekStart(s) {
+  return addDays(s, -((parse(s).getDay() + 6) % 7));
+}
+
 /** Toutes les dates de `from` à `to` inclus. */
 export function range(from, to) {
   const out = [];

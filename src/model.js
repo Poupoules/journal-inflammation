@@ -3,7 +3,7 @@
 // jamais une valeur par défaut qui fausserait l'analyse.
 import {
   ALCOHOL_GLASSES, ALCOHOL_TYPES, CUSTOM_FOOD_PREFIX, FOODS, MOODS, PAIN_INTENSITIES,
-  PAIN_SITES, SKIN_SITES, SLEEP_QUALITIES, SPORTS,
+  PAIN_SITES, PROTEINS, SKIN_SITES, SLEEP_QUALITIES, SPORTS,
 } from "./config.js";
 import { isISODate } from "./dates.js";
 
@@ -23,8 +23,10 @@ export function emptyEntry(date) {
     cortisone: null,
     injection: null,
     foods: [],
+    proteins: { midi: null, soir: null },
     alcohol: { types: [], glasses: null },
     period: false,
+    mealNotes: "",
     notes: "",
   };
 }
@@ -39,6 +41,7 @@ const VALID = {
   skin: ids(SKIN_SITES),
   foods: ids(FOODS),
   alcoholTypes: ids(ALCOHOL_TYPES),
+  proteins: ids(PROTEINS),
   glasses: ids(ALCOHOL_GLASSES),
   quality: ids(SLEEP_QUALITIES),
 };
@@ -77,6 +80,9 @@ export function normalizeEntry(raw) {
   e.cortisone = bool(raw.cortisone);
   e.injection = bool(raw.injection);
   e.foods = list(raw.foods, isFood);
+  e.proteins.midi = pick(raw.proteins?.midi, VALID.proteins);
+  e.proteins.soir = pick(raw.proteins?.soir, VALID.proteins);
+  e.mealNotes = text(raw.mealNotes);
   e.alcohol.types = list(raw.alcohol?.types, (t) => VALID.alcoholTypes.has(t));
   e.alcohol.glasses = e.alcohol.types.length ? pick(raw.alcohol?.glasses, VALID.glasses) : null;
   e.period = raw.period === true;

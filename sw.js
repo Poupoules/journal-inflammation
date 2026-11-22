@@ -1,7 +1,7 @@
 ﻿// Service worker : met l'app en cache pour qu'elle fonctionne hors ligne.
 // À chaque publication, changer VERSION (et APP_VERSION dans src/version.js) :
 // le téléphone télécharge alors la nouvelle version et propose de l'activer.
-const VERSION = "1.1.0";
+const VERSION = "1.2.0";
 const CACHE = `journal-${VERSION}`;
 
 // Liste complète des fichiers de l'app (vérifiée par les tests).
@@ -21,6 +21,7 @@ const FILES = [
   "src/foods.js",
   "src/migrations.js",
   "src/model.js",
+  "src/proteins.js",
   "src/version.js",
   "src/storage/indexeddb.js",
   "src/storage/storage.js",
